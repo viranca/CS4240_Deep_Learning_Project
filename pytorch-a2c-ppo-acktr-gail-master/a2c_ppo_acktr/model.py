@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -165,7 +166,122 @@ class NNBase(nn.Module):
 
         return x, hxs
 
+class VanillaRNN(nn.Module):
+    """
+    Vanilla recurrent neural network (a.k.a. Elman RNN) which has the following
+    update rule:
+        ht​ = tanh(W_xh * ​xt ​+ b_xh ​+ W_hh * ​h(t−1) ​+ b_hh​)
+    """
+    
+    def __init__(self, input_size, hidden_size):
+        super(VanillaRNN, self).__init__()
 
+        self.hidden_size = hidden_size
+
+        # Input to hidden weights
+        self.weight_xh = None
+
+        # Hidden to hidden biases
+        self.weight_hh = None
+
+        # Input to hidden biases
+        self.bias_xh = None
+
+        # Hidden to hidden biases
+        self.bias_hh = None
+
+        ########################################################################
+        #    TODO: Create weight and bias tensors with given name above with   #
+        #                             correct sizes.                           #
+        # NOTE: Don't forget to encapsulate weights and biases in nn.Parameter #
+        ########################################################################
+
+        # RNN parameters
+        self.weight_xh = nn.Parameter(torch.Tensor(input_size, hidden_size))
+        self.weight_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
+        self.bias_xh = nn.Parameter(torch.Tensor(hidden_size))
+        self.bias_hh = nn.Parameter(torch.Tensor(hidden_size))
+
+        ########################################################################
+        #                         END OF YOUR CODE                             #
+        ########################################################################
+
+        # Initialize parameters
+        self.reset_params()
+
+
+    def reset_params(self):
+        """
+        Reset network parameters. Applies `init_params` to all parameters.
+        """
+
+        std = 1.0 / math.sqrt(self.hidden_size)
+        self.weight_xh.data.uniform_(-std, std)
+        self.weight_hh.data.uniform_(-std, std)
+        self.bias_xh.data.uniform_(-std, std)
+        self.bias_hh.data.uniform_(-std, std)
+
+
+    def forward(self, x):
+        """
+        Args:
+            x: input with shape (N, T, D) where N is number of samples, T is
+                number of timestep and D is input size which must be equal to
+                self.input_size.
+
+        Returns:
+            y: output with a shape of (N, T, H) where H is hidden size
+        """
+
+        # Transpose input for efficient vectorized calculation. After transposing
+        # the input will have (T, N, D).
+        x = x.transpose(0, 1)
+
+        # Unpack dimensions
+        T, N = x.shape[0], x.shape[1]
+
+        # Initialize hidden states to zero. There will be one hidden state for
+        # each input, so it will have shape of (N, H)
+        h0 = torch.zeros(N, self.hidden_size, device=x.device)
+
+        # Define a list to store outputs. We will then stack them.
+        y = []
+
+        ########################################################################
+        #             TODO: Implement forward pass of Vanilla RNN              #
+        ########################################################################
+
+        ht_1 = h0
+        for t in range(T):
+            # Vanilla RNN (Elman RNN) update rule
+            xh = torch.addmm(self.bias_xh, x[t], self.weight_xh) 
+            hh = torch.addmm(self.bias_hh, ht_1, self.weight_hh)
+            ht = torch.tanh(xh + hh)
+
+            # Store output
+            y.append(ht)
+
+            # For next iteration ht-1 will be current ht
+            ht_1 = ht
+
+        ########################################################################
+        #                         END OF YOUR CODE                             #
+        ########################################################################
+        
+        # Stack the outputs. After this operation, output will have shape of
+        # (T, N, H)
+        y = torch.stack(y)
+
+        # Switch time and batch dimension, (T, N, H) -> (N, T, H)
+        y = y.transpose(0, 1)
+
+        return y
+    
+    
+    
+    
+    
+    
 class CNNBase(NNBase):
     def __init__(self, num_inputs, recurrent=False, hidden_size=512):
         super(CNNBase, self).__init__(recurrent, hidden_size, hidden_size)
