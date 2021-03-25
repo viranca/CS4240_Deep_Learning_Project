@@ -83,6 +83,34 @@ class IAMPolicy(nn.Module):
 
         return value, action, action_log_probs, rnn_hxs
 
+    def act1(self, inputs, rnn_hxs, masks, deterministic=False):
+        value, actor_features, _ = self.base1(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
+
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        return value, action, action_log_probs, rnn_hxs
+
+    def act2(self, inputs, rnn_hxs, masks, deterministic=False):
+        value, actor_features, rnn_hxs = self.base2(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
+
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        return value, action, action_log_probs, rnn_hxs
+
     def get_value(self, inputs, rnn_hxs, masks):
         value, _, _ = self.base1(inputs, rnn_hxs, masks)
         value, _, _ = self.base2(inputs, rnn_hxs, masks)

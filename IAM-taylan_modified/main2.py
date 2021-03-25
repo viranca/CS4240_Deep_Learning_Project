@@ -41,7 +41,7 @@ def main():
     envs = make_vec_envs(args.env_name, args.seed, args.num_processes,
                          args.gamma, args.log_dir, device, False)
 
-    actor_critic = Policy(
+    actor_critic = IAMPolicy(
         envs.observation_space.shape,
         envs.action_space,
         base_kwargs={'recurrent': args.recurrent_policy})
@@ -88,7 +88,7 @@ def main():
             batch_size=args.gail_batch_size,
             shuffle=True,
             drop_last=drop_last)
-
+    #
     rollouts = RolloutStorage(args.num_steps, args.num_processes,
                               envs.observation_space.shape, envs.action_space,
                               actor_critic.recurrent_hidden_state_size)
@@ -96,6 +96,24 @@ def main():
     obs = envs.reset()
     rollouts.obs[0].copy_(obs)
     rollouts.to(device)
+
+    #1
+    rollouts1 = RolloutStorage(args.num_steps, args.num_processes,
+                              envs.observation_space.shape, envs.action_space,
+                              actor_critic.recurrent_hidden_state_size)
+
+    obs = envs.reset()
+    rollouts1.obs[0].copy_(obs)
+    rollouts1.to(device)
+
+    #2
+    rollouts2 = RolloutStorage(args.num_steps, args.num_processes,
+                              envs.observation_space.shape, envs.action_space,
+                              actor_critic.recurrent_hidden_state_size)
+
+    obs = envs.reset()
+    rollouts2.obs[0].copy_(obs)
+    rollouts2.to(device)
 
     episode_rewards = deque(maxlen=10)
 
@@ -113,25 +131,96 @@ def main():
         for step in range(args.num_steps):
             # Sample actions
             with torch.no_grad():
-                value, action, action_log_prob, recurrent_hidden_states = actor_critic.act(
-                    rollouts.obs[step], rollouts.recurrent_hidden_states[step],
-                    rollouts.masks[step])
+                if step != args.num_steps:
+                    value1, action1, action_log_prob1, recurrent_hidden_states1 = actor_critic.act1(
+                        rollouts1.obs[step], rollouts1.recurrent_hidden_states[step],
+                        rollouts1.masks[step])
+                    value2, action2, action_log_prob2, recurrent_hidden_states2 = actor_critic.act2(
+                        rollouts2.obs[step], rollouts2.recurrent_hidden_states[step],
+                        rollouts2.masks[step])
+                if step == args.num_steps:
+                    # Concatenate at the last step
+                    # 128 steps to update RNN and FNN seperately,
+                    # then once they are both trained concatenate the batch, not every step in a batch
+                    # Concatenation of rollouts
+                    rollouts.obs = torch.cat(rollouts1.obs,
+                                                 rollouts2.obs)
+                    rollouts.recurrent_hidden_states = torch.cat(rollouts1.recurrent_hidden_states,
+                                                 rollouts2.recurrent_hidden_states)
+                    rollouts.rewards = torch.cat(rollouts1.rewards,rollouts2.rewards)
+                    rollouts.value_preds = torch.cat(rollouts1.value_preds,
+                                                 rollouts2.value_preds)
+                    rollouts.returns = torch.cat(rollouts1.returns,
+                                                 rollouts2.returns)
+                    rollouts.action_log_probs = torch.cat(rollouts1.action_log_probs,
+                                                 rollouts2.action_log_probs)
+                    rollouts.actions = torch.cat(rollouts1.actions,
+                                                 rollouts2.actions)
+                    rollouts.masks = torch.cat(rollouts1.masks,
+                                                 rollouts2.masks)
+                    rollouts.bad_masks = torch.cat(rollouts1.bad_masks,
+                                                 rollouts2.bad_masks)
+                    rollouts.num_steps = rollouts1.num_steps
+                    rollouts.step = rollouts1.step
 
-            # Obser reward and next obs
-            obs, reward, done, infos = envs.step(action)
 
-            for info in infos:
-                if 'episode' in info.keys():
-                    episode_rewards.append(info['episode']['r'])
+                    value, action, action_log_prob, recurrent_hidden_states = actor_critic.act(
+                        rollouts.obs[step], rollouts.recurrent_hidden_states[step],
+                        rollouts.masks[step])
 
-            # If done then clean the history of observations.
-            masks = torch.FloatTensor(
-                [[0.0] if done_ else [1.0] for done_ in done])
-            bad_masks = torch.FloatTensor(
-                [[0.0] if 'bad_transition' in info.keys() else [1.0]
-                 for info in infos])
-            rollouts.insert(obs, recurrent_hidden_states, action,
-                            action_log_prob, value, reward, masks, bad_masks)
+                    # last step
+                    obs, reward, done, infos = envs.step(action)
+
+                    for info in infos:
+                        if 'episode' in info.keys():
+                            episode_rewards.append(info['episode']['r'])
+
+                    # If done then clean the history of observations.
+                    masks = torch.FloatTensor(
+                        [[0.0] if done_ else [1.0] for done_ in done])
+                    bad_masks = torch.FloatTensor(
+                        [[0.0] if 'bad_transition' in info.keys() else [1.0]
+                         for info in infos])
+                    rollouts.insert(obs, recurrent_hidden_states, action,
+                                    action_log_prob, value, reward, masks,
+                                    bad_masks)
+
+
+            if step != args.num_steps:
+                # Obser reward and next obs
+                obs1, reward1, done1, infos1 = envs.step(action1)
+                obs2, reward2, done2, infos2 = envs.step(action2)
+
+                #1
+                for info in infos1:
+                    if 'episode' in info.keys():
+                        episode_rewards.append(info['episode']['r'])
+
+                # If done then clean the history of observations.
+                masks = torch.FloatTensor(
+                    [[0.0] if done_ else [1.0] for done_ in done1])
+                bad_masks = torch.FloatTensor(
+                    [[0.0] if 'bad_transition' in info.keys() else [1.0]
+                     for info in infos1])
+                rollouts1.insert(obs, recurrent_hidden_states1, action1,
+                                action_log_prob1, value1, reward1, masks, bad_masks)
+
+                #2
+                for info in infos2:
+                    if 'episode' in info.keys():
+                        episode_rewards.append(info['episode']['r'])
+
+                # If done then clean the history of observations.
+                masks = torch.FloatTensor(
+                    [[0.0] if done_ else [1.0] for done_ in done2])
+                bad_masks = torch.FloatTensor(
+                    [[0.0] if 'bad_transition' in info.keys() else [1.0]
+                     for info in infos2])
+                rollouts2.insert(obs, recurrent_hidden_states2, action2,
+                                action_log_prob2, value2, reward2, masks, bad_masks)
+
+
+
 
         with torch.no_grad():
             next_value = actor_critic.get_value(
