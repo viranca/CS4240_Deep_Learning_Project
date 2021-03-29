@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "main3.py", line 198, in <module>
+    main()
+  File "main3.py", line 44, in main
+    actor_critic = RPolicy(
+  File "/home/oturan/RL/IAM/a2c_ppo_acktr/model.py", line 102, in __init__
+    super(Policy, self).__init__()
+TypeError: super(type, obj): obj must be an instance or subtype of type
