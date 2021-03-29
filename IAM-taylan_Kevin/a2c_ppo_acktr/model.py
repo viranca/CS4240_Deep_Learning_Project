@@ -232,19 +232,43 @@ class FNNRNNBase(NNBase):
     def __init__(self, num_inputs, recurrent=False, hidden_size=64):
         super(FNNRNNBase, self).__init__(recurrent, num_inputs, hidden_size)
 
-    """1. Define FNN"""
-    FNN_net = nn.Sequential(
-        init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
-        init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
+                               constant_(x, 0), np.sqrt(2))
 
-    """2. Define RNN"""
-    RNN_Net = nn.Sequential(
-        init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
-        init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-    """3. Merge the two models and conclude the network:"""
+        """1. Define FNN and RNN network"""
+        self.net = nn.Sequential(
+            init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        """2. Merge the two models and conclude the network:"""
+        self.combine = nn.Linear(2,1)
 
-    """4. Create the Model:"""
+        self.actor =  nn.Sequential(
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        self.critic =  nn.Sequential(
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        self.critic_linear = init_(nn.Linear(hidden_size, 1))
 
+        self.train()
+
+    def forward(self, inputs, rnn_hxs, masks):
+        """3. Create the Model:"""
+        x_rnn = inputs
+        x_fnn = inputs
+
+        x_fnn = self.net(x_fnn)
+
+        if self.is_recurrent:
+            x_rnn, rnn_hxs = self._forward_gru(x_rnn, rnn_hxs, masks)
+            """Stack the outputs in a sequence of tensors along a 
+            new dimension"""
+            x = torch.stack(x_fnn, x_rnn, 2)
+            x = self.combine(x)[:,:,0]
+
+        hidden_critic = self.critic(x)
+        hidden_actor = self.actor(x)
+        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
 
 class FNNBase(NNBase):
     def __init__(self, num_inputs, recurrent=False, hidden_size=64):
