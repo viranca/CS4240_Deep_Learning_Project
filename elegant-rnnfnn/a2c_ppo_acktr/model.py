@@ -243,7 +243,6 @@ class MLPBase(NNBase):
 
             x = torch.stack((x_fnn,x_rnn),2)
             x = self.combine(x)[:,:,0]
-        x = x_fnn
 
         hidden_critic = self.critic(x)
         hidden_actor = self.actor(x)
