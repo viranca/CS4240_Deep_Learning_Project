@@ -32,6 +32,9 @@ except ImportError:
     pass
 
 from .environments.gymware import Warehouse
+from .environments.cartpole import CartPoleEnv
+
+
 
 def make_env(env_id, seed, rank, log_dir, allow_early_resets):
     def _thunk():
@@ -41,6 +44,8 @@ def make_env(env_id, seed, rank, log_dir, allow_early_resets):
             env = ClipAction(env)
         elif env_id == "ware":
             env = Warehouse()
+        elif env_id == "cart":
+            env = CartPoleEnv()
         else:
             env = gym.make(env_id)
 
