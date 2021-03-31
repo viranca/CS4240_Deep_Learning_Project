@@ -11,6 +11,72 @@ class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
 
+class IAMPolicy(nn.Module):
+    def __init__(self, obs_shape, action_space, base=None, base_kwargs=None):
+        super(IAMPolicy, self).__init__()
+        if base_kwargs is None:
+            base_kwargs = {}
+        if base is None:
+            if len(obs_shape) == 3:
+                raise NotImplementedError
+            elif len(obs_shape) == 1:
+                base = FNNRNNBase
+            else:
+                raise NotImplementedError
+        self.base = base(obs_shape[0], **base_kwargs)
+
+        if action_space.__class__.__name__ == "Discrete":
+            num_outputs = action_space.n
+            self.dist = Categorical(self.base.output_size, num_outputs)
+        elif action_space.__class__.__name__ == "Box":
+            num_outputs = action_space.shape[0]
+            self.dist = DiagGaussian(self.base.output_size, num_outputs)
+        elif action_space.__class__.__name__ == "MultiBinary":
+            num_outputs = action_space.shape[0]
+            self.dist = Bernoulli(self.base.output_size, num_outputs)
+        else:
+            raise NotImplementedError
+
+    @property
+    def is_recurrent(self):
+        return self.base.is_recurrent
+
+    @property
+    def recurrent_hidden_state_size(self):
+        """Size of rnn_hx."""
+        return self.base.recurrent_hidden_state_size
+
+    def forward(self, inputs, rnn_hxs, masks):
+        raise NotImplementedError
+
+    def act(self, inputs, rnn_hxs, masks, deterministic=False):
+        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
+
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        return value, action, action_log_probs, rnn_hxs
+
+    def get_value(self, inputs, rnn_hxs, masks):
+        value, _, _ = self.base(inputs, rnn_hxs, masks)
+        return value
+
+    def evaluate_actions(self, inputs, rnn_hxs, masks, action):
+        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        return value, action_log_probs, dist_entropy, rnn_hxs
+
+
 class Policy(nn.Module):
     def __init__(self, obs_shape, action_space, base=None, base_kwargs=None):
         super(Policy, self).__init__()
@@ -227,49 +293,6 @@ class MLPBase(NNBase):
 
         return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
 
-class FNNRNNBase(NNBase):
-    """Prepare inputs and init"""
-    def __init__(self, num_inputs, recurrent=False, hidden_size=64):
-        super(FNNRNNBase, self).__init__(recurrent, num_inputs, hidden_size)
-
-        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
-                               constant_(x, 0), np.sqrt(2))
-
-        """1. Define FNN and RNN network"""
-        self.net = nn.Sequential(
-            init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-        """2. Merge the two models and conclude the network:"""
-        self.combine = nn.Linear(2,1)
-
-        self.actor =  nn.Sequential(
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-        self.critic =  nn.Sequential(
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-        self.critic_linear = init_(nn.Linear(hidden_size, 1))
-
-        self.train()
-
-    def forward(self, inputs, rnn_hxs, masks):
-        """3. Create the Model:"""
-        x_rnn = inputs
-        x_fnn = inputs
-
-        x_fnn = self.net(x_fnn)
-
-        if self.is_recurrent:
-            x_rnn, rnn_hxs = self._forward_gru(x_rnn, rnn_hxs, masks)
-            """Stack the outputs in a sequence of tensors along a 
-            new dimension"""
-            x = torch.stack(x_fnn, x_rnn, 2)
-            x = self.combine(x)[:,:,0]
-
-        hidden_critic = self.critic(x)
-        hidden_actor = self.actor(x)
-        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
-
 class FNNBase(NNBase):
     def __init__(self, num_inputs, recurrent=False, hidden_size=64):
         recurrent = False
@@ -336,4 +359,46 @@ class RNNBase(NNBase):
 
 
 
+
+class FNNRNNBase(NNBase):
+    """Prepare inputs and init"""
+    def __init__(self, num_inputs, recurrent=True, hidden_size=64):
+        super(FNNRNNBase, self).__init__(recurrent, num_inputs, hidden_size)
+
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
+                               constant_(x, 0), np.sqrt(2))
+
+        """1. Define FNN and RNN network"""
+        self.net = nn.Sequential(
+            init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        """2. Merge the two models and conclude the network:"""
+        self.combine = nn.Linear(2,1)
+
+        self.actor =  nn.Sequential(
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        self.critic =  nn.Sequential(
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh(),
+            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
+        self.critic_linear = init_(nn.Linear(hidden_size, 1))
+
+        self.train()
+
+    def forward(self, inputs, rnn_hxs, masks):
+        """3. Create the Model:"""
+        x_rnn = inputs
+        x_fnn = inputs
+
+        x_fnn = self.net(x_fnn)
+
+        x_rnn, rnn_hxs = self._forward_gru(x_rnn, rnn_hxs, masks)
+        """Stack the outputs in a sequence of tensors along a 
+        new dimension"""
+        x = torch.stack(x_fnn, x_rnn, 2)
+        x = self.combine(x)[:,:,0]
+
+        hidden_critic = self.critic(x)
+        hidden_actor = self.actor(x)
+        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
 
