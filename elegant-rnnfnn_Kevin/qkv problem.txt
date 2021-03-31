@@ -1,0 +1,15 @@
+File "C:\Users\Kevin Bislip\Desktop\DL\DL PPO2\CS4240_Deep_Learning_Project\elegant-rnnfnn_Kevin\a2c_ppo_acktr\
+model.py", line 298, in forward
+    attn_out = self.self_attn(x_rnn, mask=masks)
+  File "C:\Program Files\Python38\lib\site-packages\torch\nn\modules\module.py", line 889, in _call_impl
+    result = self.forward(*input, **kwargs)
+  File "C:\Users\Kevin Bislip\Desktop\DL\DL PPO2\CS4240_Deep_Learning_Project\elegant-rnnfnn_Kevin\a2c_ppo_acktr\
+model.py", line 46, in forward
+    batch_size, seq_length, embed_dim = x.size()
+ValueError: not enough values to unpack (expected 3, got 2)
+
+
+Q , K and V (B being the batch size, T the sequence length, d model the hidden dimensionality of X
+
+batch_size, seq_length, embed_dim = x.size()
+ torch.Size([8, 73])

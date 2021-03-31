@@ -1,0 +1,15 @@
+#Running my script
+python main.py --env-name "ware" --algo ppo --use-gae --lr 2.5e-4 --clip-param 0.1 --value-loss-coef 0.5 --num-processes 8 --num-steps 128 --num-mini-batch 4 --log-interval 1 --use-linear-lr-decay --recurrent-policy --entropy-coef 0.01 --log-dir "ware/IAM/results/1" --save-dir "ware/IAM/model/1"
+
+
+
+
+#Running Taylan's script
+python main.py --env-name "ware" --algo ppo --use-gae --lr 2.5e-4 --clip-param 0.1 --value-loss-coef 0.5 --num-processes 8 --num-steps 128 --num-mini-batch 4 --log-interval 1 --use-linear-lr-decay --recurrent-policy --entropy-coef 0.01 --log-dir "ware/FNNRNN/results/kev" --save-dir "ware/FNNRNN/model/kev"
+
+
+Updates 120, num timesteps 123904, FPS 1211
+ Last 10 training episodes: mean/median reward 19.8/20.5, min/max reward 14.0/28.0
+
+Updates 160, num timesteps 164864, FPS 1207
+ Last 10 training episodes: mean/median reward 28.7/29.0, min/max reward 23.0/34.0
