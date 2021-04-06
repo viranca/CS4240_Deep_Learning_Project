@@ -122,7 +122,7 @@ class MultiheadAttention(nn.Module):
         self.qkv_proj.bias.data.fill_(0)
         nn.init.xavier_uniform_(self.o_proj.weight)
         self.o_proj.bias.data.fill_(0)
-
+# batch size = 128, sequence length = 16, embed dimension is 32
     def forward(self, x, mask=None, return_attention=False):
         batch_size, seq_length, embed_dim = x.size()
         qkv = self.qkv_proj(x)

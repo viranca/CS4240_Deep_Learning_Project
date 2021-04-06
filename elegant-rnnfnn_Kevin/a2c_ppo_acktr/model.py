@@ -46,8 +46,8 @@ class MultiheadAttention(nn.Module):
     def forward(self, x, mask=None, return_attention=False):
         # print("x is: ",x)
         # print("x size is: ", x.size() )
-        batch_size, seq_length = x.size()
-        embed_dim = self.embed_dim
+        # batch_size, seq_length, embed_dim = torch.Size([8*32,8,73])
+        batch_size, seq_length, embed_dim = x.size()
         qkv = self.qkv_proj(x)
 
         # Separate Q, K, V from linear output
@@ -274,7 +274,7 @@ class MLPBase(NNBase):
                                constant_(x, 0), np.sqrt(2))
 
         # Attention layer
-        self.self_attn = MultiheadAttention(num_inputs, num_inputs, 1)
+        self.self_attn = MultiheadAttention(num_inputs, num_inputs, num_inputs)
         self.norm1 = nn.LayerNorm(num_inputs)
         self.dropout = nn.Dropout(0.1)
 
@@ -301,8 +301,10 @@ class MLPBase(NNBase):
         # Attention part
         x_rnn = inputs
         print("Inputs are: ", inputs)
-        attn_out = self.self_attn(x = inputs)
-        x_rnn = x_rnn + self.dropout(attn_out)
+        print("rnn_hxs are: ", rnn_hxs)
+
+        attn_out = self.self_attn(x=inputs)
+        x_rnn = self.dropout(attn_out)
         x_rnn = self.norm1(x_rnn)
 
         x_fnn = inputs
