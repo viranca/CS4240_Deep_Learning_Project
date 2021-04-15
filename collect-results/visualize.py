@@ -29,7 +29,7 @@ import matplotlib as mpl
 # LOG_DIRS = 'results-taylan/pong/cnn/results/1' # CNN + RNN Parallel result 8
 # cores
 # TAY
-selected_env = 'pong'
+selected_env = 'ware'
 if selected_env == 'ware':
     color = ['red', 'firebrick', 'green', 'chartreuse', 'black', 'blue',
               'royalblue']
@@ -47,21 +47,21 @@ results = pu.load_results(LOG_DIRS)
 
 fig = pu.plot_results(results, average_group=True, split_fn=lambda _: '',
                       shaded_std=False,COLORS=color,select_env=selected_env,
-                      xlabel='Steps', ylabel='Average Reward')
+                      xlabel='Steps', ylabel='Average Reward',legend_outside=True)
 #%%
 import matplotlib.pyplot as plt
 import matplotlib
 
 if selected_env == 'ware':
     fig = matplotlib.pyplot.gcf()
-    plt.gcf().subplots_adjust(bottom=0.15,left=0.15)
+    plt.gcf().subplots_adjust(bottom=0.15,top=0.9,left=0.15,right=0.7)
     fig.set_size_inches(30, 30)
     plt.savefig('plot_ware.png', dpi=150)
 elif selected_env == 'pong':
     fig = matplotlib.pyplot.gcf()
-    plt.gcf().subplots_adjust(bottom=0.15,left=0.15)
+    plt.gcf().subplots_adjust(bottom=0.15,top=0.9,left=0.15, right=0.3)
     fig.set_size_inches(30, 30)
-    plt.savefig('plot_ware.png', dpi=150)
+    plt.savefig('plot_pong.png', dpi=150)
 else:
     pass
 # LOG_DIRS = 'results-taylan/ware/rnn/results/1_1' # FNN result 8 cores VIR

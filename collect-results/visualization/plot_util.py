@@ -1,4 +1,10 @@
 import matplotlib.pyplot as plt
+import matplotlib
+font = {'family' : 'arial',
+        'weight' : 'bold',
+        'size'   : 20}
+
+matplotlib.rc('font', **font)
 import os.path as osp
 import json
 import os
@@ -359,8 +365,8 @@ def plot_results(
             ax.legend(
                 g2l.values(),
                 ['%s'%(g) for g in leg_names] if average_group else g2l.keys(),
-                loc='lower right',
-                bbox_to_anchor=(1,1) if legend_outside else None)
+                loc='right' if legend_outside else None,
+                bbox_to_anchor=(1.56,0.5) if legend_outside else None)
         ax.set_title(sk)
         # add xlabels, but only to the bottom row
         if xlabel is not None:
@@ -373,13 +379,15 @@ def plot_results(
                 plt.sca(ax)
                 plt.ylabel(ylabel)
     if select_env =='ware':
+        plt.title('Warehouse environment')
         plt.ylim([26,42])
         plt.xticks(np.arange(0,4010000,500000))
         plt.xlim([10, 4010000])
     elif select_env =='pong':
+        plt.title('Pong environment')
         plt.ylim([-21, 21])
-        plt.xticks(np.arange(0, 6000000, 500000))
-        plt.xlim([0, 6000000])
+        plt.xticks(np.arange(0, 6010000, 500000))
+        plt.xlim([0, 6010000])
     else:
         pass
     return f, axarr
