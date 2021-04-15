@@ -15,9 +15,17 @@ from a2c_ppo_acktr import algo, utils
 from a2c_ppo_acktr.algo import gail
 from a2c_ppo_acktr.arguments import get_args
 from a2c_ppo_acktr.envs import make_vec_envs
-from a2c_ppo_acktr.model import Policy
 from a2c_ppo_acktr.storage import RolloutStorage
 from evaluation import evaluate
+
+#Choose which policy you want to run here:
+##Original
+from a2c_ppo_acktr.model_original import Policy
+##Parallel
+from a2c_ppo_acktr.model import Policy
+#IAM
+from a2c_ppo_acktr.model_bottle import Policy
+
 
 
 def main():
